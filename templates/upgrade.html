@@ -31,6 +31,7 @@
             {% if plan.id == current_plan_id %}
                 <button class="btn btn-disabled" disabled>Current Plan</button>
             {% else %}
+            {# This form now POSTs to /upgrade, which then redirects to /checkout #}
             <form method="POST" action="{{ url_for('upgrade') }}">
                 <input type="hidden" name="plan_id" value="{{ plan.id }}">
                 <button type="submit" class="btn btn-primary btn-choose-plan">Choose {{ plan.name }}</button>

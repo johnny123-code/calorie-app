@@ -12,13 +12,26 @@
     <p>Consider <a href="{{ url_for('upgrade') }}">upgrading to a premium plan</a> for more features!</p>
     {% endif %}
 
+    <div class="calorie-summary-home card"> {# Added for home page summary #}
+        <h4>Today's Progress:</h4>
+        <p>Consumed: <strong>{{ calories_consumed }}</strong> / {{ calorie_goal }} Calories</p>
+        <div class="progress-bar-container">
+            <div class="progress-bar" style="width: {{ progress_percent }}%;">
+                {{ calories_consumed if progress_percent > 10 else '' }}
+            </div>
+        </div>
+    </div>
+
+
     <p>Use the navigation bar to explore different sections:</p>
     <ul>
-        <li><strong>Foods:</strong> Browse food categories and their calorie information.</li>
+        <li><strong>Log Calories:</strong> Track your daily food intake.</li>
+        <li><strong>Foods List:</strong> Browse food categories and their calorie information.</li>
         <li><strong>Q&A Board:</strong> Ask questions and see what others are discussing.</li>
     </ul>
 
     <div class="cta-buttons">
+        <a href="{{ url_for('log_calories_page') }}" class="btn btn-primary">Log Calories Now</a>
         <a href="{{ url_for('foods') }}" class="btn btn-secondary">Browse Foods</a>
         <a href="{{ url_for('questions') }}" class="btn btn-secondary">Go to Q&A Board</a>
     </div>

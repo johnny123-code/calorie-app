@@ -1,0 +1,316 @@
+{% extends "layout.html" %}
+
+{% block title %}Log Your Calories - Food Calorie Tracker{% endblock %}
+
+{% block content %}
+<div class="page-content calorie-logger-page">
+    <h2>Log Your Daily Calories</h2>
+    <p>Search for food items, select servings, and add them to your daily log. Your goal is {{ calorie_goal }} calories.</p>
+    <div id="calorieThresholdWarning" class="alert alert-warning" style="display:none;">
+        You have reached your daily calorie goal of {{ calorie_goal }}. You cannot add more items unless you reset or edit existing items to reduce your total.
+    </div>
+
+    <div class="calorie-summary card">
+        <div class="chart-container">
+            <canvas id="calorieChart"></canvas>
+        </div>
+        <div class="summary-text">
+            <p>Consumed: <strong id="consumedCaloriesText">{{ calories_consumed }}</strong> / {{ calorie_goal }} Calories</p>
+            <button id="resetCaloriesBtn" class="btn btn-secondary btn-small">Reset Daily Log</button>
+        </div>
+    </div>
+
+    <div class="search-container card">
+        <h3>Search for Food</h3>
+        <div class="food-entry-form">
+            <div class="form-group search-input-group">
+                <label for="foodSearchInput">Food Item</label>
+                <input type="text" id="foodSearchInput" placeholder="E.g., Apple, Chicken Breast...">
+            </div>
+            <div class="form-group servings-input-group">
+                <label for="servingsInput">Servings</label>
+                <select id="servingsInput">
+                    <option value="0.25">0.25</option>
+                    <option value="0.5">0.5</option>
+                    <option value="0.75">0.75</option>
+                    <option value="1" selected>1</option>
+                    <option value="1.5">1.5</option>
+                    <option value="2">2</option>
+                    <option value="2.5">2.5</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                </select>
+            </div>
+        </div>
+        <div id="searchResultsDropdown" class="search-results-dropdown">
+            </div>
+    </div>
+
+    <div class="logged-items-container card" style="display:none;"> {# Initially hidden #}
+        <h3>Today's Logged Items</h3>
+        <ul id="loggedItemsList">
+            {# Logged items will appear here #}
+        </ul>
+    </div>
+
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const foodSearchInput = document.getElementById('foodSearchInput');
+        const servingsInput = document.getElementById('servingsInput'); 
+        const searchResultsDropdown = document.getElementById('searchResultsDropdown');
+        const consumedCaloriesText = document.getElementById('consumedCaloriesText');
+        const resetCaloriesBtn = document.getElementById('resetCaloriesBtn');
+        const loggedItemsList = document.getElementById('loggedItemsList');
+        const loggedItemsContainer = document.querySelector('.logged-items-container');
+        const calorieThresholdWarning = document.getElementById('calorieThresholdWarning');
+
+        const allFoods = {{ all_foods_json | tojson }};
+        let currentCaloriesConsumed = parseFloat("{{ calories_consumed }}"); // Ensure it's a number
+        const calorieGoal = parseFloat("{{ calorie_goal }}");
+        let loggedItemsArray = []; // To store items logged: {id: Date.now(), name: '', baseCalories: 0, servings: 0, totalCalories: 0}
+
+        const ctx = document.getElementById('calorieChart').getContext('2d');
+        let calorieChart = new Chart(ctx, {
+            type: 'doughnut',
+            data: {
+                labels: ['Consumed', 'Remaining'],
+                datasets: [{
+                    label: 'Calories',
+                    data: [currentCaloriesConsumed, Math.max(0, calorieGoal - currentCaloriesConsumed)],
+                    backgroundColor: ['rgba(52, 168, 122, 0.8)', 'rgba(220, 220, 220, 0.8)'],
+                    borderColor: ['rgba(44, 138, 91, 1)', 'rgba(200, 200, 200, 1)'],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '70%', 
+                plugins: {
+                    legend: { position: 'bottom' },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.label || ''}: ${context.parsed} Calories`;
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        function checkAndToggleInputs() {
+            if (currentCaloriesConsumed >= calorieGoal) {
+                calorieThresholdWarning.style.display = 'block';
+                foodSearchInput.disabled = true;
+                servingsInput.disabled = true;
+            } else {
+                calorieThresholdWarning.style.display = 'none';
+                foodSearchInput.disabled = false;
+                servingsInput.disabled = false;
+            }
+        }
+
+        function updateChartAndSummary() {
+            consumedCaloriesText.textContent = Math.round(currentCaloriesConsumed); 
+            calorieChart.data.datasets[0].data = [
+                currentCaloriesConsumed,
+                Math.max(0, calorieGoal - currentCaloriesConsumed)
+            ];
+            calorieChart.update();
+            checkAndToggleInputs(); // Check threshold after every update
+        }
+        
+        updateChartAndSummary(); 
+
+        foodSearchInput.addEventListener('input', function () {
+            if (foodSearchInput.disabled) return; // Don't search if inputs disabled
+            const searchTerm = this.value.toLowerCase().trim();
+            searchResultsDropdown.innerHTML = ''; 
+            searchResultsDropdown.style.display = 'none';
+
+            if (searchTerm.length < 2) return;
+
+            const matchedFoods = allFoods.filter(food => 
+                food.name.toLowerCase().includes(searchTerm)
+            ).slice(0, 7); 
+
+            if (matchedFoods.length > 0) {
+                searchResultsDropdown.style.display = 'block';
+                matchedFoods.forEach(food => {
+                    const itemDiv = document.createElement('div');
+                    itemDiv.classList.add('dropdown-item');
+                    itemDiv.textContent = `${food.name} (${food.calories} cal per serving)`; 
+                    itemDiv.dataset.foodName = food.name;
+                    itemDiv.dataset.foodBaseCalories = food.calories; 
+                    itemDiv.addEventListener('click', function () {
+                        const selectedServings = parseFloat(servingsInput.value) || 1; 
+                        addFoodToLog({name: food.name, baseCalories: food.calories}, selectedServings); 
+                        foodSearchInput.value = ''; 
+                        searchResultsDropdown.innerHTML = '';
+                        searchResultsDropdown.style.display = 'none';
+                    });
+                    searchResultsDropdown.appendChild(itemDiv);
+                });
+            }
+        });
+
+        document.addEventListener('click', function(event) {
+            if (!foodSearchInput.contains(event.target) && !searchResultsDropdown.contains(event.target)) {
+                searchResultsDropdown.style.display = 'none';
+            }
+        });
+
+        function addFoodToLog(foodDetails, servings) {
+            const caloriesForThisEntry = foodDetails.baseCalories * servings;
+
+            if (currentCaloriesConsumed + caloriesForThisEntry > calorieGoal && currentCaloriesConsumed < calorieGoal) {
+                 // If adding this item pushes over the limit, but we are not already over
+                alert(`Adding this item (${caloriesForThisEntry} cal) would exceed your daily goal of ${calorieGoal} calories. It has not been added.`);
+                checkAndToggleInputs(); // Re-check, might disable inputs now
+                return;
+            } else if (currentCaloriesConsumed >= calorieGoal) {
+                // If already at or over the goal, don't add.
+                alert(`You have already reached your daily calorie goal of ${calorieGoal}. Cannot add more items.`);
+                checkAndToggleInputs();
+                return;
+            }
+
+
+            currentCaloriesConsumed += caloriesForThisEntry;
+            const newItem = {
+                id: Date.now(), // Unique ID for the logged item
+                name: foodDetails.name, 
+                baseCalories: foodDetails.baseCalories,
+                servings: servings,
+                totalCalories: caloriesForThisEntry 
+            };
+            loggedItemsArray.push(newItem);
+            updateChartAndSummary();
+            updateLoggedItemsList();
+
+            sendCalorieUpdateToServer(caloriesForThisEntry);
+        }
+        
+        function sendCalorieUpdateToServer(caloriesDelta) {
+            fetch("{{ url_for('update_calories_api') }}", {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ calories: caloriesDelta }) 
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    console.log('Calories updated on server:', data.new_total_calories);
+                    // Optionally, sync currentCaloriesConsumed with server if there's a mismatch concern
+                    // currentCaloriesConsumed = data.new_total_calories; 
+                    // updateChartAndSummary();
+                } else {
+                    alert('Error updating calories on server. Please try again.');
+                    console.error('Server error:', data.error);
+                    // Consider reverting client-side change if server fails
+                }
+            })
+            .catch(error => {
+                alert('Network error. Could not update calories. Please try again.');
+                console.error('Network error:', error);
+            });
+        }
+
+        function updateLoggedItemsList() {
+            loggedItemsList.innerHTML = ''; 
+            if (loggedItemsArray.length > 0) {
+                loggedItemsContainer.style.display = 'block';
+                loggedItemsArray.forEach((item, index) => { // Use index or item.id for targeting
+                    const listItem = document.createElement('li');
+                    listItem.innerHTML = `
+                        <span>${item.name} (${item.servings} serving${item.servings != 1 ? 's' : ''}) - ${Math.round(item.totalCalories)} cal</span>
+                        <button class="btn btn-edit-item btn-small" data-item-id="${item.id}">Edit</button>
+                    `;
+                    loggedItemsList.appendChild(listItem);
+
+                    listItem.querySelector('.btn-edit-item').addEventListener('click', function() {
+                        handleEditItem(item.id);
+                    });
+                });
+            } else {
+                loggedItemsContainer.style.display = 'none';
+            }
+        }
+
+        function handleEditItem(itemId) {
+            const itemIndex = loggedItemsArray.findIndex(item => item.id === itemId);
+            if (itemIndex === -1) return;
+
+            const itemToEdit = loggedItemsArray[itemIndex];
+            const currentServings = itemToEdit.servings;
+            
+            const newServingsStr = prompt(`Edit servings for ${itemToEdit.name} (current: ${currentServings}):`, currentServings);
+            if (newServingsStr === null) return; // User cancelled
+
+            const newServings = parseFloat(newServingsStr);
+            if (isNaN(newServings) || newServings <= 0) {
+                alert("Invalid number of servings. Please enter a positive number.");
+                return;
+            }
+
+            const oldTotalCaloriesForItem = itemToEdit.totalCalories;
+            const newTotalCaloriesForItem = itemToEdit.baseCalories * newServings;
+            const calorieDifference = newTotalCaloriesForItem - oldTotalCaloriesForItem;
+
+            // Check threshold before applying edit
+            const potentialNewTotalConsumed = currentCaloriesConsumed + calorieDifference;
+            if (calorieDifference > 0 && potentialNewTotalConsumed > calorieGoal && currentCaloriesConsumed < calorieGoal) {
+                 alert(`This edit would make you exceed your daily goal of ${calorieGoal} calories. Please try a smaller number of servings or reset your log.`);
+                 return;
+            }
+             if (calorieDifference > 0 && currentCaloriesConsumed >= calorieGoal) {
+                alert(`You are already at/over your daily calorie goal. This edit would increase it further. Please try a smaller number of servings or reset your log.`);
+                return;
+            }
+
+
+            // Update client-side data
+            currentCaloriesConsumed += calorieDifference;
+            loggedItemsArray[itemIndex].servings = newServings;
+            loggedItemsArray[itemIndex].totalCalories = newTotalCaloriesForItem;
+
+            updateChartAndSummary();
+            updateLoggedItemsList();
+
+            // Send the difference to the server
+            sendCalorieUpdateToServer(calorieDifference);
+        }
+
+        resetCaloriesBtn.addEventListener('click', function() {
+            if (confirm('Are you sure you want to reset your daily calorie log to 0?')) {
+                fetch("{{ url_for('reset_daily_calories_api') }}", {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        currentCaloriesConsumed = 0;
+                        loggedItemsArray = []; 
+                        updateChartAndSummary();
+                        updateLoggedItemsList();
+                        alert('Daily calorie log has been reset.');
+                    } else {
+                        alert('Error resetting calories on server.');
+                    }
+                })
+                .catch(error => {
+                    alert('Network error. Could not reset calories.');
+                    console.error('Network error:', error);
+                });
+            }
+        });
+        checkAndToggleInputs(); // Initial check when page loads
+    });
+</script>
+{% endblock %}

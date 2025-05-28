@@ -1,5 +1,5 @@
 # <<<< app.py >>>>
-from flask import Flask, render_template, request, redirect, url_for, session, flash
+from flask import Flask, render_template, request, redirect, url_for, session, flash, jsonify # Added jsonify
 import os
 
 app = Flask(__name__)
@@ -41,6 +41,13 @@ food_data = {
     ]
 } 
 
+# Flatten food_data for easier searching and pass to templates or API
+all_food_items_list = []
+for category, items in food_data.items():
+    for item in items:
+        all_food_items_list.append({"name": item["name"], "calories": item["calories"], "category": category})
+
+
 premium_plans_data = [
     {"id": "silver", "name": "Silver Plan", "price": 9.99, "interval": "month", 
      "features": ["Access to standard calorie data", "Basic community Q&A", "Email support"]},
@@ -49,6 +56,8 @@ premium_plans_data = [
     {"id": "platinum", "name": "Platinum Plan", "price": 39.99, "interval": "month", 
      "features": ["All Gold features", "Personalized meal planning (simulated)", "Direct expert support (simulated)", "Early access to new features"]},
 ]
+
+DAILY_CALORIE_GOAL = 4000
 
 # --- Authentication ---
 @app.route('/login', methods=['GET', 'POST'])
@@ -60,6 +69,7 @@ def login():
             session['logged_in'] = True
             session['username'] = username
             session['user_plan'] = 'free' 
+            session['daily_calories_consumed'] = 0 # Initialize calorie counter on login
             flash('Login successful!', 'success')
             return redirect(url_for('home'))
         else:
@@ -71,6 +81,7 @@ def logout():
     session.pop('logged_in', None)
     session.pop('username', None)
     session.pop('user_plan', None)
+    session.pop('daily_calories_consumed', None) # Clear calorie counter on logout
     flash('You have been logged out.', 'info')
     return redirect(url_for('login'))
 
@@ -78,6 +89,9 @@ def logout():
 def login_required(f):
     def wrap(*args, **kwargs):
         if 'logged_in' in session:
+            # Ensure daily_calories_consumed is initialized if user is logged in but it's missing
+            if 'daily_calories_consumed' not in session:
+                session['daily_calories_consumed'] = 0
             return f(*args, **kwargs)
         else:
             flash("You need to login first", "warning")
@@ -96,7 +110,18 @@ def home():
         plan_details = next((plan for plan in premium_plans_data if plan['id'] == current_plan_id), None)
         if plan_details:
             current_plan_name = plan_details['name']
-    return render_template('home.html', username=session.get('username'), current_plan_name=current_plan_name)
+    
+    calories_consumed = session.get('daily_calories_consumed', 0)
+    progress_percent = min((calories_consumed / DAILY_CALORIE_GOAL) * 100, 100)
+
+
+    return render_template('home.html', 
+                           username=session.get('username'), 
+                           current_plan_name=current_plan_name,
+                           calories_consumed=calories_consumed,
+                           calorie_goal=DAILY_CALORIE_GOAL,
+                           progress_percent=progress_percent)
+
 
 @app.route('/questions', methods=['GET', 'POST'])
 @login_required
@@ -116,22 +141,19 @@ def questions():
 def foods():
     return render_template('foods.html', food_categories=food_data)
 
-@app.route('/upgrade', methods=['GET', 'POST']) # MODIFIED: Added POST method
+@app.route('/upgrade', methods=['GET', 'POST']) 
 @login_required
 def upgrade():
-    if request.method == 'POST': # ADDED: Logic to handle POST request from upgrade form
+    if request.method == 'POST': 
         chosen_plan_id = request.form.get('plan_id')
         chosen_plan = next((plan for plan in premium_plans_data if plan['id'] == chosen_plan_id), None)
         
         if chosen_plan:
-            # Redirect to checkout for the chosen plan
             return redirect(url_for('checkout', plan_id=chosen_plan_id))
         else:
             flash("Invalid plan selected.", 'danger')
-            # Fallback to GET request for the upgrade page
             return render_template('upgrade.html', plans=premium_plans_data, current_plan_id=session.get('user_plan'))
             
-    # This is for GET request: displays the plans
     return render_template('upgrade.html', plans=premium_plans_data, current_plan_id=session.get('user_plan'))
 
 # --- Checkout and Payment Simulation ---
@@ -197,6 +219,45 @@ def cancel_subscription():
     session['user_plan'] = 'free'
     flash(f"Your subscription to the {plan_name} has been cancelled. You are now on the Free plan.", 'success')
     return redirect(url_for('home'))
+
+# --- Calorie Logger ---
+@app.route('/log_calories')
+@login_required
+def log_calories_page():
+    calories_consumed = session.get('daily_calories_consumed', 0)
+    return render_template('log_calories.html', 
+                           all_foods_json=all_food_items_list, 
+                           calories_consumed=calories_consumed,
+                           calorie_goal=DAILY_CALORIE_GOAL)
+
+@app.route('/api/update_calories', methods=['POST'])
+@login_required
+def update_calories_api():
+    data = request.get_json()
+    calories_to_add = data.get('calories', 0)
+    
+    if not isinstance(calories_to_add, (int, float)) or calories_to_add < 0:
+        return jsonify({"success": False, "error": "Invalid calorie value"}), 400
+
+    current_calories = session.get('daily_calories_consumed', 0)
+    new_total_calories = current_calories + calories_to_add
+    session['daily_calories_consumed'] = new_total_calories
+    
+    return jsonify({
+        "success": True, 
+        "new_total_calories": new_total_calories,
+        "goal": DAILY_CALORIE_GOAL
+    })
+
+@app.route('/api/reset_daily_calories', methods=['POST'])
+@login_required
+def reset_daily_calories_api():
+    session['daily_calories_consumed'] = 0
+    return jsonify({
+        "success": True,
+        "new_total_calories": 0,
+        "goal": DAILY_CALORIE_GOAL
+    })
 
 
 if __name__ == '__main__':

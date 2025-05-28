@@ -14,7 +14,8 @@
             <ul class="nav-links">
                 {% if session.get('logged_in') %}
                     <li><a href="{{ url_for('home') }}">Home</a></li>
-                    <li><a href="{{ url_for('foods') }}">Foods</a></li>
+                    <li><a href="{{ url_for('log_calories_page') }}">Log Calories</a></li>
+                    <li><a href="{{ url_for('foods') }}">Foods List</a></li>
                     <li><a href="{{ url_for('questions') }}">Q&A Board</a></li>
                     {% if session.get('user_plan', 'free') == 'free' %}
                         <li><a href="{{ url_for('upgrade') }}" class="nav-link-upgrade">Upgrade Plan</a></li>

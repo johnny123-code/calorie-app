@@ -32,7 +32,6 @@
         </div>
     </div>
     {% else %}
-    {# This case should ideally be handled by the route redirecting #}
     <p class="alert alert-warning">Could not load your subscription details. Please <a href="{{ url_for('home') }}">return home</a> or contact support.</p>
     {% endif %}
 
