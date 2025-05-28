@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+
+{% block title %}Upgrade Your Plan - Food Calorie Tracker{% endblock %}
+
+{% block content %}
+<div class="page-content upgrade-page">
+    <h2>Choose Your Premium Plan</h2>
+    <p>Unlock more features and enhance your calorie tracking experience by upgrading your plan.</p>
+
+    {% if current_plan_id != 'free' %}
+        {% set current_plan_details = plans | selectattr('id', 'equalto', current_plan_id) | first %}
+        <div class="current-plan-info alert alert-info">
+            You are currently on the <strong>{{ current_plan_details.name if current_plan_details else current_plan_id | capitalize }}</strong>.
+        </div>
+    {% else %}
+        <div class="current-plan-info alert alert-info">
+             You are currently on the <strong>Free Plan</strong>.
+        </div>
+    {% endif %}
+
+    <div class="pricing-container">
+        {% for plan in plans %}
+        <div class="plan-card {% if plan.id == current_plan_id %}current{% endif %}">
+            <h3 class="plan-name">{{ plan.name }}</h3>
+            <p class="plan-price">${{ "%.2f"|format(plan.price) }}<span class="plan-interval">/{{ plan.interval }}</span></p>
+            <ul class="plan-features">
+                {% for feature in plan.features %}
+                <li>{{ feature }}</li>
+                {% endfor %}
+            </ul>
+            {% if plan.id == current_plan_id %}
+                <button class="btn btn-disabled" disabled>Current Plan</button>
+            {% else %}
+            <form method="POST" action="{{ url_for('upgrade') }}">
+                <input type="hidden" name="plan_id" value="{{ plan.id }}">
+                <button type="submit" class="btn btn-primary btn-choose-plan">Choose {{ plan.name }}</button>
+            </form>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "layout.html" %}
+
+{% block title %}Checkout - {{ plan.name }}{% endblock %}
+
+{% block content %}
+<div class="page-content checkout-page">
+    <h2>Checkout: {{ plan.name }}</h2>
+    <p>You are subscribing to the <strong>{{ plan.name }}</strong> for <strong>${{ "%.2f"|format(plan.price) }}/{{ plan.interval }}</strong>.</p>
+    <p class="text-muted"><small>This is a simulated checkout process. No real payment will be made.</small></p>
+
+    <div class="form-container payment-form">
+        <h3>Enter Payment Details</h3>
+        <form method="POST" action="{{ url_for('process_payment') }}">
+            <input type="hidden" name="plan_id" value="{{ plan.id }}">
+
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" value="{{ user_email_placeholder }}" required placeholder="johndoe@example.com">
+            </div>
+
+            <div class="form-group">
+                <label for="card_number">Card Information</label>
+                <input type="text" id="card_number" name="card_number" required placeholder="5555-4444-3333-2222" pattern="\d{4}-?\d{4}-?\d{4}-?\d{4}">
+            </div>
+
+            <div class="form-row">
+                <div class="form-group half-width">
+                    <label for="expiry_date">Expiration Date (MM/YY)</label>
+                    <input type="text" id="expiry_date" name="expiry_date" required placeholder="08/29" pattern="(0[1-9]|1[0-2])\/\d{2}">
+                </div>
+                <div class="form-group half-width">
+                    <label for="cvc">CVC</label>
+                    <input type="text" id="cvc" name="cvc" required placeholder="333" pattern="\d{3,4}">
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label for="name_on_card">Name on Card</label>
+                <input type="text" id="name_on_card" name="name_on_card" required placeholder="John Doe">
+            </div>
+            
+            <div class="form-row">
+                <div class="form-group half-width">
+                    <label for="country">Country or Region</label>
+                    <select id="country" name="country" required>
+                        <option value="US" selected>United States</option>
+                        <option value="CA">Canada</option>
+                        <option value="GB">United Kingdom</option>
+                        {_# Add more countries as needed #_}
+                    </select>
+                </div>
+                <div class="form-group half-width">
+                    <label for="zip_code">ZIP Code</label>
+                    <input type="text" id="zip_code" name="zip_code" required placeholder="20854" pattern="\d{5}(-\d{4})?">
+                </div>
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-submit-payment">Subscribe to {{ plan.name }}</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+
+{% block title %}Manage Your Subscription - Food Calorie Tracker{% endblock %}
+
+{% block content %}
+<div class="page-content manage-subscription-page">
+    <h2>Manage Your Subscription</h2>
+
+    {% if plan %}
+    <div class="current-plan-details card">
+        <h3>Your Current Plan: {{ plan.name }}</h3>
+        <p class="plan-price-display"><strong>Price:</strong> ${{ "%.2f"|format(plan.price) }} / {{ plan.interval }}</p>
+        
+        <h4 class="features-title">Key Features:</h4>
+        <ul class="plan-features-list">
+            {% for feature in plan.features %}
+            <li>{{ feature }}</li>
+            {% endfor %}
+        </ul>
+
+        <p class="renewal-info">
+            Your plan will auto-renew (simulated). To make changes or upgrade/downgrade, 
+            please visit the <a href="{{ url_for('upgrade') }}">plans page</a>.
+        </p>
+
+        <div class="cancel-subscription-section">
+            <h4>Cancel Your Subscription</h4>
+            <p>If you cancel, your premium benefits will end, and your account will revert to the Free plan. This action is immediate (simulation).</p>
+            <form method="POST" action="{{ url_for('cancel_subscription') }}" onsubmit="return confirm('Are you sure you want to cancel your subscription? This action is immediate.');">
+                <button type="submit" class="btn btn-danger btn-cancel-sub">Cancel Subscription</button>
+            </form>
+        </div>
+    </div>
+    {% else %}
+    {# This case should ideally be handled by the route redirecting #}
+    <p class="alert alert-warning">Could not load your subscription details. Please <a href="{{ url_for('home') }}">return home</a> or contact support.</p>
+    {% endif %}
+
+    <div class="back-to-home-link">
+        <a href="{{ url_for('home') }}" class="btn btn-secondary">Back to Home</a>
+    </div>
+</div>
+{% endblock %}

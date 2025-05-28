@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Food Calorie Tracker{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header>
+        <nav class="container">
+            <a href="{{ url_for('home') if session.get('logged_in') else url_for('login') }}" class="nav-logo">CalorieApp</a>
+            <ul class="nav-links">
+                {% if session.get('logged_in') %}
+                    <li><a href="{{ url_for('home') }}">Home</a></li>
+                    <li><a href="{{ url_for('foods') }}">Foods</a></li>
+                    <li><a href="{{ url_for('questions') }}">Q&A Board</a></li>
+                    {% if session.get('user_plan', 'free') == 'free' %}
+                        <li><a href="{{ url_for('upgrade') }}" class="nav-link-upgrade">Upgrade Plan</a></li>
+                    {% else %}
+                         <li><a href="{{ url_for('manage_subscription') }}">Manage Subscription</a></li>
+                    {% endif %}
+                    <li><a href="{{ url_for('logout') }}">Logout ({{ session.get('username') }})</a></li>
+                {% else %}
+                    <li><a href="{{ url_for('login') }}">Login</a></li>
+                {% endif %}
+            </ul>
+        </nav>
+    </header>
+
+    <main class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }}">{{ message }}</div>
+                {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Food Calorie Tracker App. All rights reserved.</p>
+        </div>
+    </footer>
+</body>
+</html>
